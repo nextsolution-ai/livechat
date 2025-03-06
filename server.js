@@ -9,7 +9,18 @@ const io = require('socket.io')(http, {
 });
 const cors = require('cors');
 
-app.use(cors());
+// Update CORS configuration to allow both localhost and GitHub Pages
+const corsOptions = {
+    origin: [
+        'http://localhost:3000',
+        'https://nextsolution-ai.github.io/livechat',
+        'https://nextsolution-ai.github.io'
+    ],
+    methods: ['GET', 'POST'],
+    credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(express.static('public'));
 
 // Store connected users
@@ -35,6 +46,7 @@ io.on('connection', (socket) => {
     });
 });
 
+// Update the server listen configuration
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
