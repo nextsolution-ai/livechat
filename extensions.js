@@ -118,10 +118,23 @@ export const LiveChatExtension = {
             // Initialize Socket.IO connection with error handling
             let socket;
             try {
-              socket = io('http://localhost:3000', {
-                transports: ['websocket'],
-                reconnection: true,
-                reconnectionAttempts: 5
+              // Use the same server URL configuration as script.js
+              const SERVER_URL = {
+                  PRODUCTION: 'https://livechat-server-s24m.onrender.com',
+                  LOCAL: 'http://localhost:3000'
+              };
+
+              function getServerUrl() {
+                  if (window.location.hostname.includes('github.io')) {
+                      return SERVER_URL.PRODUCTION;
+                  }
+                  return SERVER_URL.LOCAL;
+              }
+
+              socket = io(getServerUrl(), {
+                  transports: ['websocket'],
+                  reconnection: true,
+                  reconnectionAttempts: 5
               });
 
               socket.on('connect', () => {
@@ -133,7 +146,7 @@ export const LiveChatExtension = {
                 appendMessage('Unable to connect to chat server. Please try again later.', 'server');
               });
             } catch (error) {
-              console.error('Socket initialization error:', error);
+              console.error('Socket connection error:', error);
               appendMessage('Chat service is currently unavailable.', 'server');
               return;
             }
