@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voiceflow Chat</title>
+</head>
+<body style="
+  background: linear-gradient(135deg, #000000, #1b1818);
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+">
+
+<style>
+  #voiceflow-chat {
+    display: block !important;
+    font-family: 'Open Sans', sans-serif;
+  }
+</style>   
+
+  <script type="module">
+    import {
+    LiveChatExtension,
+    } from "./extensions.js";
+
+    (function(d, t) {
+        var v = d.createElement(t), s = d.getElementsByTagName(t)[0];
+        v.onload = function() {
+          window.voiceflow.chat.load({
+            verify: { projectID: '67c9abe85e08501c94effe6e' },
+            url: 'https://general-runtime.voiceflow.com',
+            versionID: 'production',
+            launch: {
+              event: {
+                type: "launch",
+                payload: {
+                  currentURL: window.location.href,
+                  currentTime: new Date().toISOString(),
+                  userLanguage: navigator.language || navigator.userLanguage,
+                },
+              },
+            },
+            assistant: {
+              persistence: 'memory',
+              extensions: [
+              LiveChatExtension,
+              ],
+            },
+          });
+        }
+        v.src = "https://cdn.voiceflow.com/widget-next/bundle.mjs"; 
+        v.type = "text/javascript"; 
+        s.parentNode.insertBefore(v, s);
+    })(document, 'script');
+  </script>
+
+</body>
+</html>
