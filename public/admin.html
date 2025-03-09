@@ -6,13 +6,33 @@
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
+            display: flex;
+        }
+        .chats-list {
+            width: 300px;
+            border-right: 1px solid #ccc;
+            padding: 20px;
+            height: calc(100vh - 40px);
+        }
+        .chat-item {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .chat-item.active {
+            background-color: #e3f2fd;
         }
         .chat-container {
-            max-width: 800px;
-            margin: 0 auto;
+            flex: 1;
+            padding: 20px;
+            height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
         }
         .chat-history {
-            height: 500px;
+            flex: 1;
             border: 1px solid #ccc;
             padding: 20px;
             overflow-y: auto;
@@ -50,18 +70,25 @@
             border-radius: 4px;
             cursor: pointer;
         }
-        button:hover {
-            background-color: #1976d2;
+        .timestamp {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 4px;
         }
     </style>
 </head>
 <body>
+    <div class="chats-list" id="chats-list">
+        <h2>Active Chats</h2>
+        <div id="active-chats"></div>
+    </div>
+    
     <div class="chat-container">
         <h1>Live Chat Admin Panel</h1>
         <div class="chat-history" id="chat-history"></div>
         <div class="input-area">
-            <input type="text" id="message-input" placeholder="Type your response...">
-            <button onclick="sendMessage()">Send</button>
+            <input type="text" id="message-input" placeholder="Type your response..." disabled>
+            <button onclick="sendMessage()" id="send-button" disabled>Send</button>
         </div>
     </div>
 
@@ -72,6 +99,9 @@
             LOCAL: 'http://localhost:3000'
         };
 
+        let currentRoom = null;
+        const socket = io(getServerUrl());
+        
         function getServerUrl() {
             if (window.location.hostname.includes('github.io')) {
                 return SERVER_URL.PRODUCTION;
@@ -79,31 +109,131 @@
             return SERVER_URL.LOCAL;
         }
 
-        const socket = io(getServerUrl());
-        
-        socket.on('chat message', (data) => {
-            appendMessage(data.message, data.userId === socket.id ? 'admin' : 'user');
+        // Handle new chat notifications
+        socket.on('new chat', (data) => {
+            addChatToList(data.roomId, data.timestamp);
         });
 
-        function appendMessage(message, sender) {
+        // Handle chat ended
+        socket.on('chat ended', (roomId) => {
+            removeChatFromList(roomId);
+            if (currentRoom === roomId) {
+                currentRoom = null;
+                disableChat();
+            }
+        });
+
+        // Handle chat history
+        socket.on('chat history', (data) => {
+            clearChatHistory();
+            data.messages.forEach(msg => {
+                appendMessage(msg.message, msg.userId === socket.id ? 'admin' : 'user', msg.timestamp);
+            });
+        });
+
+        // Handle incoming messages
+        socket.on('chat message', (data) => {
+            if (currentRoom === data.roomId && data.userId !== socket.id) {
+                appendMessage(data.message, data.userId === socket.id ? 'admin' : 'user', data.timestamp);
+            }
+        });
+
+        // Add this new event listener for admin messages
+        socket.on('admin message', (data) => {
+            // If we're viewing this room and it's not our own message
+            if (currentRoom === data.roomId && data.userId !== socket.id) {
+                appendMessage(data.message, data.userId === socket.id ? 'admin' : 'user', data.timestamp);
+            }
+            
+            // Update the chat item to show it's active
+            const chatItem = document.getElementById(`chat-${data.roomId}`);
+            if (chatItem) {
+                // Update the timestamp
+                const timestampDiv = chatItem.querySelector('.timestamp');
+                if (timestampDiv) {
+                    timestampDiv.textContent = new Date(data.timestamp).toLocaleTimeString();
+                }
+                
+                // Add a visual indicator for new messages if not in current room
+                if (currentRoom !== data.roomId) {
+                    chatItem.style.backgroundColor = '#e3f2fd';
+                }
+            }
+        });
+
+        function addChatToList(roomId, timestamp) {
+            const chatsList = document.getElementById('active-chats');
+            const chatItem = document.createElement('div');
+            chatItem.className = 'chat-item';
+            chatItem.id = `chat-${roomId}`;
+            chatItem.innerHTML = `
+                <div>Chat #${roomId.slice(0, 6)}</div>
+                <div class="timestamp">${new Date(timestamp).toLocaleTimeString()}</div>
+            `;
+            chatItem.onclick = () => selectChat(roomId);
+            chatsList.appendChild(chatItem);
+        }
+
+        function removeChatFromList(roomId) {
+            const chatItem = document.getElementById(`chat-${roomId}`);
+            if (chatItem) {
+                chatItem.remove();
+            }
+        }
+
+        function selectChat(roomId) {
+            currentRoom = roomId;
+            document.querySelectorAll('.chat-item').forEach(item => {
+                item.classList.remove('active');
+                item.style.backgroundColor = ''; // Remove new message indicator
+            });
+            document.getElementById(`chat-${roomId}`).classList.add('active');
+            enableChat();
+            socket.emit('join room', roomId);
+        }
+
+        function enableChat() {
+            document.getElementById('message-input').disabled = false;
+            document.getElementById('send-button').disabled = false;
+        }
+
+        function disableChat() {
+            document.getElementById('message-input').disabled = true;
+            document.getElementById('send-button').disabled = true;
+            clearChatHistory();
+        }
+
+        function clearChatHistory() {
+            document.getElementById('chat-history').innerHTML = '';
+        }
+
+        function appendMessage(message, sender, timestamp) {
             const chatHistory = document.getElementById('chat-history');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}-message`;
-            messageDiv.textContent = message;
+            messageDiv.innerHTML = `
+                <div>${message}</div>
+                <div class="timestamp">${new Date(timestamp).toLocaleTimeString()}</div>
+            `;
             chatHistory.appendChild(messageDiv);
             chatHistory.scrollTop = chatHistory.scrollHeight;
         }
 
         function sendMessage() {
+            if (!currentRoom) return;
+            
             const input = document.getElementById('message-input');
             const message = input.value.trim();
             if (message) {
+                // Show message immediately in admin panel
+                appendMessage(message, 'admin', new Date().toISOString());
+                
+                // Send to server
                 socket.emit('chat message', message);
                 input.value = '';
             }
         }
 
-        // Allow sending with Enter key
         document.getElementById('message-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 sendMessage();
