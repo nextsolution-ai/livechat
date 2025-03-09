@@ -150,9 +150,10 @@ export const LiveChatExtension = {
             });
   
             socket.on('connect', () => {
-              console.log('User connected to chat server');
+              console.log('User connected to chat server with ID:', socket.id);
               // Emit start chat event when connected
               socket.emit('start chat');
+              console.log('Sent start chat event');
             });
   
             socket.on('connect_error', (error) => {
@@ -178,8 +179,10 @@ export const LiveChatExtension = {
           // Function to send a message
           function sendMessage(message) {
             if (socket && socket.connected) {
+              console.log('Sending message:', message);
               socket.emit('chat message', message);
             } else {
+              console.error('Socket not connected');
               appendMessage('Unable to send message. Please check your connection.', 'server');
             }
           }
@@ -188,6 +191,10 @@ export const LiveChatExtension = {
           socket.on('chat message', (data) => {
             console.log('Received chat message:', data);
             appendMessage(data.message, data.userId === socket.id ? 'user' : 'server');
+          });
+  
+          socket.on('error', (error) => {
+            console.error('Socket error:', error);
           });
   
           const sendBtn = customContainer.querySelector('#send-btn');
