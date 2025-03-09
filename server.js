@@ -33,11 +33,17 @@ io.on('connection', (socket) => {
     // Handle user starting a new chat
     socket.on('start chat', () => {
         const roomId = socket.id; // Use user's socket ID as room ID
+        console.log(`New chat started. Room ID: ${roomId}`);
+        
         chatRooms.set(roomId, {
             users: new Set([socket.id]),
             messages: []
         });
         userRooms.set(socket.id, roomId);
+        
+        // Join the room
+        socket.join(roomId);
+        console.log(`User ${socket.id} joined room ${roomId}`);
         
         // Notify admin panel of new chat
         io.emit('new chat', {
@@ -49,23 +55,29 @@ io.on('connection', (socket) => {
 
     // Handle admin joining a chat room
     socket.on('join room', (roomId) => {
+        console.log(`Admin attempting to join room ${roomId}`);
         const room = chatRooms.get(roomId);
         if (room) {
             socket.join(roomId);
             room.users.add(socket.id);
             userRooms.set(socket.id, roomId);
+            console.log(`Admin joined room ${roomId}`);
             
             // Send chat history to admin
             socket.emit('chat history', {
                 roomId,
                 messages: room.messages
             });
+        } else {
+            console.log(`Room ${roomId} not found`);
         }
     });
 
     // Handle chat messages
     socket.on('chat message', (msg) => {
         const roomId = userRooms.get(socket.id);
+        console.log(`Message received from ${socket.id} in room ${roomId}`);
+        
         if (roomId && chatRooms.has(roomId)) {
             const messageData = {
                 userId: socket.id,
@@ -77,11 +89,14 @@ io.on('connection', (socket) => {
             // Store message in room history
             chatRooms.get(roomId).messages.push(messageData);
             
-            // Broadcast message to everyone in the room including sender
-            io.in(roomId).emit('chat message', messageData);
+            // Broadcast to the specific room
+            io.to(roomId).emit('chat message', messageData);
+            console.log(`Message broadcast to room ${roomId}`);
             
-            // Also send to admin if not already in the room
+            // Notify admin of new message
             io.emit('admin message', messageData);
+        } else {
+            console.log(`Room ${roomId} not found for message`);
         }
     });
 

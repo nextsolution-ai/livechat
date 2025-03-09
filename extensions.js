@@ -150,7 +150,7 @@ export const LiveChatExtension = {
             });
   
             socket.on('connect', () => {
-              console.log('Connected to chat server');
+              console.log('User connected to chat server');
               // Emit start chat event when connected
               socket.emit('start chat');
             });
@@ -186,7 +186,7 @@ export const LiveChatExtension = {
   
           // Listen for incoming messages
           socket.on('chat message', (data) => {
-            // Show all messages in the chat window
+            console.log('Received chat message:', data);
             appendMessage(data.message, data.userId === socket.id ? 'user' : 'server');
           });
   

@@ -100,7 +100,11 @@
         };
 
         let currentRoom = null;
-        const socket = io(getServerUrl());
+        const socket = io(getServerUrl(), {
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionAttempts: 5
+        });
         
         function getServerUrl() {
             if (window.location.hostname.includes('github.io')) {
@@ -108,6 +112,14 @@
             }
             return SERVER_URL.LOCAL;
         }
+
+        socket.on('connect', () => {
+            console.log('Admin connected to server');
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('Connection error:', error);
+        });
 
         // Handle new chat notifications
         socket.on('new chat', (data) => {
@@ -133,6 +145,7 @@
 
         // Handle incoming messages
         socket.on('chat message', (data) => {
+            console.log('Received chat message:', data);
             if (currentRoom === data.roomId && data.userId !== socket.id) {
                 appendMessage(data.message, data.userId === socket.id ? 'admin' : 'user', data.timestamp);
             }
@@ -140,26 +153,27 @@
 
         // Add this new event listener for admin messages
         socket.on('admin message', (data) => {
-            // If we're viewing this room and it's not our own message
+            console.log('Received admin message:', data);
             if (currentRoom === data.roomId && data.userId !== socket.id) {
                 appendMessage(data.message, data.userId === socket.id ? 'admin' : 'user', data.timestamp);
             }
             
-            // Update the chat item to show it's active
+            updateChatListItem(data);
+        });
+
+        function updateChatListItem(data) {
             const chatItem = document.getElementById(`chat-${data.roomId}`);
             if (chatItem) {
-                // Update the timestamp
                 const timestampDiv = chatItem.querySelector('.timestamp');
                 if (timestampDiv) {
                     timestampDiv.textContent = new Date(data.timestamp).toLocaleTimeString();
                 }
                 
-                // Add a visual indicator for new messages if not in current room
                 if (currentRoom !== data.roomId) {
                     chatItem.style.backgroundColor = '#e3f2fd';
                 }
             }
-        });
+        }
 
         function addChatToList(roomId, timestamp) {
             const chatsList = document.getElementById('active-chats');
@@ -182,14 +196,23 @@
         }
 
         function selectChat(roomId) {
+            console.log(`Selecting chat room: ${roomId}`);
             currentRoom = roomId;
+            
             document.querySelectorAll('.chat-item').forEach(item => {
                 item.classList.remove('active');
-                item.style.backgroundColor = ''; // Remove new message indicator
+                item.style.backgroundColor = '';
             });
-            document.getElementById(`chat-${roomId}`).classList.add('active');
-            enableChat();
-            socket.emit('join room', roomId);
+            
+            const selectedChat = document.getElementById(`chat-${roomId}`);
+            if (selectedChat) {
+                selectedChat.classList.add('active');
+                enableChat();
+                socket.emit('join room', roomId);
+                console.log(`Joined room: ${roomId}`);
+            } else {
+                console.error(`Chat room element not found: ${roomId}`);
+            }
         }
 
         function enableChat() {
